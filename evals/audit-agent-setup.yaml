@@ -1,0 +1,10 @@
+skill: audit-agent-setup
+should_trigger:
+  - Check how this repo is set up for coding agents.
+  - Tidy our AGENTS.md and rule files.
+  - Why do Cursor and Claude read different instructions here?
+should_not_trigger:
+  - Audit the REST API.
+  - Write a commit message.
+  - Add a skill to jig.
+first_action: Read references/agent-setup-rules.md, build the rule table, and stop for approval before editing.

@@ -32,9 +32,15 @@ Desktop.ini
 .env.*
 !.env.example
 
+# Pull request message from /draft-pr-msg
+PULL_REQUEST.md
+
 # Python (CLI uses inline python3; ignore caches if scripts grow)
 __pycache__/
 *.py[cod]
 .Python
 .venv/
 venv/
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/

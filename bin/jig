@@ -1,0 +1,681 @@
+#!/usr/bin/env python3
+"""Discover skills in this pack and point other repos at them.
+
+The files under .agents/skills are the only copies. link creates symlinks.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import shutil
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+SKILLS_DIR = ROOT / ".agents" / "skills"
+NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+CITE_RE = re.compile(r"`((?:references|assets)/[^`]+)`")
+CATEGORY_ORDER = {"dev": 0, "api": 1, "agents": 2, "ux": 3, "repo": 4}
+ALLOWED_KEYS = {
+    "name",
+    "description",
+    "license",
+    "compatibility",
+    "metadata",
+    "allowed-tools",
+    "disable-model-invocation",
+}
+MAX_SKILL_LINES = 500
+COPY_MARKER = ".jig-copy"
+DESCRIPTION_RE = re.compile(r"\bUse (?:only )?when\b")
+DRY_RUN = False
+
+
+@dataclass
+class Skill:
+    name: str
+    description: str
+    directory: Path
+    skill_md: Path
+    meta: dict
+    body: str
+
+    @property
+    def metadata(self) -> dict:
+        raw = self.meta.get("metadata") or {}
+        return raw if isinstance(raw, dict) else {}
+
+    @property
+    def category(self) -> str:
+        return str(self.metadata.get("category", ""))
+
+    @property
+    def distributed(self) -> bool:
+        return str(self.metadata.get("distribute", "true")).lower() != "false"
+
+
+def unquote(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        return value[1:-1]
+    return value
+
+
+def parse_frontmatter(text: str) -> tuple[dict, str]:
+    if not text.startswith("---"):
+        raise ValueError("missing frontmatter")
+    lines = text.splitlines()
+    meta: dict = {}
+    nested: dict | None = None
+    nested_key: str | None = None
+    for index, raw in enumerate(lines[1:], start=2):
+        if raw.strip() == "---":
+            body = "\n".join(lines[index:]).lstrip("\n")
+            return meta, body
+        if not raw.strip() or raw.lstrip().startswith("#"):
+            continue
+        indent = len(raw) - len(raw.lstrip(" "))
+        line = raw.strip()
+        if ":" not in line:
+            raise ValueError(f"line {index}: expected key: value")
+        key, value = line.split(":", 1)
+        key = key.strip()
+        value = value.strip()
+        if indent >= 2:
+            if nested is None or nested_key is None:
+                raise ValueError(f"line {index}: nested key {key} has no parent")
+            nested[key] = unquote(value)
+            continue
+        nested = None
+        nested_key = None
+        if value == "":
+            nested = {}
+            nested_key = key
+            meta[key] = nested
+        else:
+            meta[key] = unquote(value)
+    raise ValueError("unterminated frontmatter")
+
+
+def load_skills() -> tuple[list[Skill], list[str]]:
+    skills: list[Skill] = []
+    errors: list[str] = []
+    if not SKILLS_DIR.is_dir():
+        return skills, ["missing .agents/skills"]
+    for directory in sorted(path for path in SKILLS_DIR.iterdir() if path.is_dir()):
+        skill_md = directory / "SKILL.md"
+        if not skill_md.is_file():
+            errors.append(f"{directory.name}: missing SKILL.md")
+            continue
+        try:
+            meta, body = parse_frontmatter(skill_md.read_text())
+        except ValueError as exc:
+            errors.append(f"{skill_md.relative_to(ROOT)}: {exc}")
+            continue
+        name = str(meta.get("name", ""))
+        description = str(meta.get("description", ""))
+        skills.append(
+            Skill(
+                name=name,
+                description=description,
+                directory=directory,
+                skill_md=skill_md,
+                meta=meta,
+                body=body,
+            )
+        )
+    skills.sort(key=lambda skill: (CATEGORY_ORDER.get(skill.category, 99), skill.name))
+    return skills, errors
+
+
+def die(errors: list[str]) -> None:
+    for message in errors:
+        print(f"error: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def require_skills() -> list[Skill]:
+    skills, errors = load_skills()
+    if errors:
+        die(errors)
+    return skills
+
+
+def find_skill(skills: list[Skill], skill_id: str) -> Skill:
+    for skill in skills:
+        if skill.name == skill_id:
+            return skill
+    known = ", ".join(skill.name for skill in skills) or "(none)"
+    die([f"unknown skill {skill_id!r}. Known: {known}"])
+    raise AssertionError
+
+
+def print_body(body: str) -> None:
+    sys.stdout.write(body)
+    if body and not body.endswith("\n"):
+        sys.stdout.write("\n")
+
+
+def cmd_list(as_json: bool = False) -> None:
+    skills = require_skills()
+    if as_json:
+        print(
+            json.dumps(
+                [
+                    {
+                        "name": skill.name,
+                        "category": skill.category,
+                        "version": str(skill.metadata.get("version", "")),
+                        "distributed": skill.distributed,
+                        "description": skill.description,
+                        "path": str(skill.skill_md),
+                    }
+                    for skill in skills
+                ],
+                indent=2,
+            )
+        )
+        return
+    if not skills:
+        return
+    name_w = max(len(skill.name) for skill in skills)
+    cat_w = max(len(skill.category) for skill in skills)
+    cat_w = max(cat_w, len("CATEGORY"))
+    print(f"{'ID'.ljust(name_w)}  {'CATEGORY'.ljust(cat_w)}  DESCRIPTION")
+    print(f"{'-' * name_w}  {'-' * cat_w}  {'-' * 11}")
+    for skill in skills:
+        print(f"{skill.name.ljust(name_w)}  {skill.category.ljust(cat_w)}  {skill.description}")
+
+
+def bundle_files(skill: Skill) -> list[Path]:
+    found: list[Path] = []
+    for folder in ("references", "assets"):
+        directory = skill.directory / folder
+        if not directory.is_dir():
+            continue
+        found.extend(sorted(path for path in directory.rglob("*") if path.is_file()))
+    return found
+
+
+def cmd_show(skill_id: str, full: bool) -> None:
+    skill = find_skill(require_skills(), skill_id)
+    print_body(skill.body)
+    if not full:
+        return
+    for path in bundle_files(skill):
+        rel = path.relative_to(skill.directory)
+        print(f"\n\n---\n\n# {skill.name} / {rel}\n")
+        print_body(path.read_text())
+
+
+def cmd_path(skill_id: str) -> None:
+    skill = find_skill(require_skills(), skill_id)
+    print(skill.skill_md)
+
+
+def cmd_compose(ids: list[str]) -> None:
+    skills = require_skills()
+    if not ids:
+        die(["compose requires at least one skill id"])
+    chosen = [find_skill(skills, skill_id) for skill_id in ids]
+    print(
+        "Run these skills in order. Read each SKILL.md. "
+        "Open references/ and assets/ only when that skill tells you to.\n"
+    )
+    for index, skill in enumerate(chosen, start=1):
+        print(f"{index}. {skill.name}")
+        print(f"   {skill.skill_md}")
+
+
+def is_copy(path: Path) -> bool:
+    return path.is_dir() and not path.is_symlink() and (path / COPY_MARKER).is_file()
+
+
+def copy_skill(source: Path, dest: Path) -> None:
+    if dest.exists():
+        shutil.rmtree(dest)
+    shutil.copytree(source, dest)
+    (dest / COPY_MARKER).write_text(f"copied from {source}\n")
+
+
+def link_symlink(source: Path, dest: Path) -> str:
+    relative = os.path.relpath(source.resolve(), dest.parent.resolve())
+    if dest.is_symlink():
+        if os.readlink(dest) == relative:
+            return "ok"
+        if not DRY_RUN:
+            dest.unlink()
+    elif is_copy(dest):
+        if not DRY_RUN:
+            copy_skill(source, dest)
+        return "copied"
+    elif dest.exists():
+        die(
+            [
+                f"{dest} exists and is not a symlink. "
+                "Remove that copy so the pack can stay the only source."
+            ]
+        )
+    if DRY_RUN:
+        return "would"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        dest.symlink_to(relative)
+    except OSError:
+        copy_skill(source, dest)
+        print(
+            "warning: symlinks are not available here; copied skills instead. "
+            "Re-run jig link after a skill changes, or enable symlinks (Windows Developer Mode).",
+            file=sys.stderr,
+        )
+        return "copied"
+    return "linked"
+
+
+def owned_by_jig(child: Path) -> bool:
+    """True for a symlink into this pack, or a marked copy of one of its skills."""
+    if is_copy(child):
+        return True
+    if not child.is_symlink():
+        return False
+    target = Path(os.path.normpath(child.parent.resolve() / os.readlink(child)))
+    try:
+        target.relative_to(SKILLS_DIR.resolve())
+    except ValueError:
+        return False
+    return True
+
+
+def remove_link(child: Path) -> None:
+    print(f"{'would remove' if DRY_RUN else 'removed'} {child}")
+    if DRY_RUN:
+        return
+    if child.is_symlink():
+        child.unlink()
+    else:
+        shutil.rmtree(child)
+
+
+def remove_stale(directory: Path, expected: set[str]) -> None:
+    if not directory.is_dir():
+        return
+    for child in sorted(directory.iterdir()):
+        if child.name not in expected and owned_by_jig(child):
+            remove_link(child)
+
+
+def link_into(directory: Path, skills: list[Skill]) -> None:
+    expected = {skill.name for skill in skills}
+    remove_stale(directory, expected)
+    for skill in skills:
+        dest = directory / skill.name
+        state = link_symlink(skill.directory, dest)
+        print(f"{state:6}  {dest}")
+
+
+def link_directory_alias(source: Path, dest: Path) -> None:
+    """Point dest at source. One symlink, so a provider sees the same skill tree."""
+    relative = os.path.relpath(source.resolve(), dest.parent.resolve())
+    if DRY_RUN:
+        state = "ok" if dest.is_symlink() and os.readlink(dest) == relative else "would"
+        print(f"{state:6}  {dest}")
+        return
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if dest.is_symlink():
+        if os.readlink(dest) == relative:
+            print(f"ok      {dest}")
+            return
+        dest.unlink()
+    elif dest.exists():
+        if dest.is_dir() and all(child.is_symlink() for child in dest.iterdir()):
+            for child in dest.iterdir():
+                child.unlink()
+            dest.rmdir()
+        else:
+            die(
+                [
+                    f"{dest} contains files of its own. "
+                    "Skills belong in .agents/skills."
+                ]
+            )
+    try:
+        dest.symlink_to(relative)
+    except OSError:
+        die([f"cannot symlink {dest}. Enable symlinks (Windows Developer Mode) and retry."])
+    print(f"linked  {dest}")
+
+
+def link_same_tree(source: Path, dest: Path, skills: list[Skill]) -> None:
+    """Point dest at source. An existing skill directory gains symlinks beside its own."""
+    if dest.is_symlink() or not dest.exists():
+        link_directory_alias(source, dest)
+        return
+    if dest.is_dir():
+        link_into(dest, skills)
+        return
+    die([f"{dest} exists and is not a directory."])
+
+
+def print_ready(skills: list[Skill]) -> None:
+    print()
+    print("Ready. The same skill names work in Cursor, Claude Code, Codex, and Antigravity.")
+    for skill in skills:
+        action = "Check" if skill.name.startswith("audit-") else "Start"
+        print(f"{action}: Use the {skill.name} skill.")
+
+
+def cmd_link(target: str | None, user: bool) -> None:
+    skills = require_skills()
+    if user and target:
+        die(["pass either --user or a target directory, not both"])
+    selected = [skill for skill in skills if skill.distributed]
+    if user:
+        home = Path.home()
+        agents_skills = home / ".agents" / "skills"
+        link_into(agents_skills, selected)
+        # Claude Code reads ~/.claude/skills. Antigravity reads
+        # ~/.gemini/config/skills. Cursor and Codex read ~/.agents/skills.
+        link_same_tree(agents_skills, home / ".claude" / "skills", selected)
+        link_same_tree(agents_skills, home / ".gemini" / "config" / "skills", selected)
+        print_ready(selected)
+        return
+    if not target:
+        die(["link requires a target directory, or --user"])
+    destination = Path(target).expanduser().resolve()
+    if not destination.is_dir():
+        die([f"not a directory: {destination}"])
+    if destination == ROOT:
+        print("jig is the source. Skills stay in .agents/skills.")
+        return
+    agents_skills = destination / ".agents" / "skills"
+    link_into(agents_skills, selected)
+    # Claude Code loads .claude/skills and does not scan .agents/skills.
+    link_directory_alias(agents_skills, destination / ".claude" / "skills")
+    print_ready(selected)
+
+
+def user_locations() -> list[Path]:
+    home = Path.home()
+    return [
+        home / ".agents" / "skills",
+        home / ".claude" / "skills",
+        home / ".gemini" / "config" / "skills",
+    ]
+
+
+def project_locations(destination: Path) -> list[Path]:
+    return [destination / ".agents" / "skills", destination / ".claude" / "skills"]
+
+
+def resolve_locations(target: str | None, user: bool) -> tuple[list[Path], str]:
+    if user and target:
+        die(["pass either --user or a target directory, not both"])
+    if user:
+        return user_locations(), "jig link --user"
+    if not target:
+        die(["a target directory or --user is required"])
+    destination = Path(target).expanduser().resolve()
+    if not destination.is_dir():
+        die([f"not a directory: {destination}"])
+    return project_locations(destination), f"jig link {destination}"
+
+
+def cmd_unlink(target: str | None, user: bool) -> None:
+    locations, _ = resolve_locations(target, user)
+    for directory in locations:
+        remove_stale(directory, set())
+    print("Done. Only links and copies that point into jig were removed.")
+
+
+def diagnose(directory: Path, skills: list[Skill]) -> list[str]:
+    """Return one problem line per broken, missing, or stale entry in directory."""
+    if not directory.exists() and not directory.is_symlink():
+        return [f"{directory}: missing"]
+    problems: list[str] = []
+    if directory.is_symlink() and not directory.exists():
+        return [f"{directory}: broken symlink"]
+    expected = {skill.name for skill in skills}
+    for skill in skills:
+        entry = directory / skill.name
+        if entry.is_symlink():
+            if not entry.exists():
+                problems.append(f"{entry}: broken symlink")
+            elif entry.resolve() != skill.directory.resolve():
+                problems.append(f"{entry}: points somewhere other than jig")
+        elif is_copy(entry):
+            if (entry / "SKILL.md").read_text() != skill.skill_md.read_text():
+                problems.append(f"{entry}: stale copy")
+        elif entry.exists():
+            problems.append(f"{entry}: a real directory, not a jig link")
+        else:
+            problems.append(f"{entry}: missing")
+    for child in sorted(directory.iterdir()):
+        if child.name not in expected and owned_by_jig(child):
+            problems.append(f"{child}: skill no longer distributed")
+    return problems
+
+
+def cmd_doctor(target: str | None, user: bool) -> None:
+    skills = require_skills()
+    selected = [skill for skill in skills if skill.distributed]
+    locations, fix = resolve_locations(target, user)
+    problems: list[str] = []
+    for directory in locations:
+        found = diagnose(directory, selected)
+        status = "ok" if not found else f"{len(found)} problem(s)"
+        print(f"{status:14}{directory}")
+        problems.extend(found)
+    if not problems:
+        print(f"Healthy. {len(selected)} skills visible to every agent.")
+        return
+    for line in problems:
+        print(f"  {line}")
+    print(f"Fix: {os.path.relpath(Path(__file__).resolve())} {fix.removeprefix('jig ')}")
+    raise SystemExit(1)
+
+
+def cmd_new(skill_id: str, category: str) -> None:
+    if not NAME_RE.match(skill_id) or len(skill_id) > 64:
+        die(["id must be kebab-case, 1-64 characters"])
+    template = SKILLS_DIR / "new-skill" / "assets"
+    directory = SKILLS_DIR / skill_id
+    eval_file = ROOT / "evals" / f"{skill_id}.yaml"
+    if directory.exists() or eval_file.exists():
+        die([f"{skill_id} already exists"])
+    values = {"{{id}}": skill_id, "{{category}}": category}
+
+    def fill(name: str) -> str:
+        text = (template / name).read_text()
+        for key, value in values.items():
+            text = text.replace(key, value)
+        return text
+
+    directory.mkdir(parents=True)
+    (directory / "SKILL.md").write_text(fill("SKILL.md"))
+    (directory / "references").mkdir()
+    eval_file.parent.mkdir(exist_ok=True)
+    eval_file.write_text(fill("eval.yaml"))
+    print(f"created {directory.relative_to(ROOT)}/SKILL.md")
+    print(f"created {eval_file.relative_to(ROOT)}")
+    print("Replace every TODO, add a README row, then run ./bin/jig check.")
+
+
+def cmd_eval(skill_id: str) -> None:
+    find_skill(require_skills(), skill_id)
+    path = ROOT / "evals" / f"{skill_id}.yaml"
+    if not path.is_file():
+        die([f"missing evals/{skill_id}.yaml"])
+    print_body(path.read_text())
+
+
+def validate_readme(skills: list[Skill]) -> list[str]:
+    readme = ROOT / "README.md"
+    if not readme.is_file():
+        return ["missing README.md"]
+    text = readme.read_text()
+    listed = set(re.findall(r"\.agents/skills/([a-z0-9-]+)/SKILL\.md", text))
+    wanted = {skill.name for skill in skills if skill.distributed and skill.category != "repo"}
+    errors = [f"README.md: no row for skill {name}" for name in sorted(wanted - listed)]
+    known = {skill.name for skill in skills}
+    errors += [f"README.md: lists unknown skill {name}" for name in sorted(listed - known)]
+    return errors
+
+
+def validate_skill(skill: Skill) -> list[str]:
+    errors: list[str] = []
+    rel = skill.skill_md.relative_to(ROOT)
+    if skill.name != skill.directory.name:
+        errors.append(f"{rel}: name {skill.name!r} does not match {skill.directory.name}")
+    if not skill.name or not NAME_RE.match(skill.name) or len(skill.name) > 64:
+        errors.append(f"{rel}: name must be kebab-case, 1–64 characters")
+    if not skill.description or len(skill.description) > 1024:
+        errors.append(f"{rel}: description must be 1–1024 characters")
+    if not skill.category:
+        errors.append(f"{rel}: metadata.category is required")
+    if "version" not in skill.metadata:
+        errors.append(f"{rel}: metadata.version is required")
+    for cited in CITE_RE.findall(skill.body):
+        if not (skill.directory / cited).exists():
+            errors.append(f"{rel}: missing {cited}")
+    unknown = sorted(set(skill.meta) - ALLOWED_KEYS)
+    if unknown:
+        errors.append(f"{rel}: unknown frontmatter keys {', '.join(unknown)}")
+    first = skill.description.split(" ", 1)[0]
+    if skill.description and not first.endswith("s"):
+        errors.append(f"{rel}: description must start with a third-person verb")
+    if skill.description and not DESCRIPTION_RE.search(skill.description):
+        errors.append(f"{rel}: description must say when to use it ('Use when ...')")
+    lines = skill.skill_md.read_text().count("\n") + 1
+    if lines > MAX_SKILL_LINES:
+        errors.append(f"{rel}: {lines} lines; keep SKILL.md under {MAX_SKILL_LINES}")
+    if str(skill.meta.get("disable-model-invocation", "")).lower() == "true":
+        if not (skill.directory / "agents" / "openai.yaml").is_file():
+            errors.append(f"{rel}: explicit-invoke skill needs agents/openai.yaml")
+    if skill.distributed and not (ROOT / "evals" / f"{skill.name}.yaml").is_file():
+        errors.append(f"{rel}: missing evals/{skill.name}.yaml")
+    return errors
+
+
+def cmd_check() -> None:
+    skills, errors = load_skills()
+    for skill in skills:
+        errors.extend(validate_skill(skill))
+    errors.extend(validate_readme(skills))
+    claude_md = (ROOT / "CLAUDE.md").read_text().strip() if (ROOT / "CLAUDE.md").is_file() else ""
+    if claude_md != "@AGENTS.md":
+        errors.append("CLAUDE.md must contain only @AGENTS.md")
+    if not (ROOT / "AGENTS.md").is_file():
+        errors.append("missing AGENTS.md")
+    if (ROOT / "manifest.yaml").exists():
+        errors.append("manifest.yaml duplicates SKILL.md frontmatter; delete it")
+    if (ROOT / "prompts").exists():
+        errors.append("prompts/ duplicates .agents/skills; delete it")
+    for path in (
+        ROOT / ".cursor" / "commands",
+        ROOT / ".cursor" / "rules",
+        ROOT / ".cursor" / "skills",
+        ROOT / ".claude",
+        ROOT / ".agent" / "skills",
+        ROOT / ".codex",
+        ROOT / ".gemini",
+        ROOT / "GEMINI.md",
+    ):
+        if path.exists():
+            errors.append(
+                f"{path.relative_to(ROOT)} holds a provider copy; keep procedures in .agents/skills"
+            )
+    if errors:
+        die(errors)
+    print(f"ok  {len(skills)} skills, catalog is SKILL.md frontmatter")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="jig",
+        description="List this pack and symlink it into Cursor, Claude Code, Codex, and Antigravity.",
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    list_p = sub.add_parser("list", help="List skills from SKILL.md frontmatter")
+    list_p.add_argument("--json", action="store_true", help="Machine-readable output")
+    sub.add_parser("check", help="Check that skills, pointers, and the catalog agree")
+
+    show = sub.add_parser("show", help="Print a skill body")
+    show.add_argument("id")
+    show.add_argument(
+        "--full",
+        action="store_true",
+        help="Also print references and assets, for a chat with no checkout",
+    )
+
+    path = sub.add_parser("path", help="Print the absolute path of SKILL.md")
+    path.add_argument("id")
+
+    compose = sub.add_parser(
+        "compose",
+        help="Print a run order of skill paths, without inlining the files",
+    )
+    compose.add_argument("ids", nargs="+")
+
+    link = sub.add_parser("link", help="Symlink skills into a repo's .agents/skills")
+    link.add_argument("target", nargs="?", help="Existing repository")
+    link.add_argument(
+        "--user",
+        action="store_true",
+        help="Link distributed skills for every agent on this machine",
+    )
+    link.add_argument("--dry-run", action="store_true", help="Print the plan, write nothing")
+
+    unlink = sub.add_parser("unlink", help="Remove links and copies that point into jig")
+    unlink.add_argument("target", nargs="?", help="Repository to clean")
+    unlink.add_argument("--user", action="store_true", help="Clean this machine's skill folders")
+    unlink.add_argument("--dry-run", action="store_true", help="Print the plan, write nothing")
+
+    doctor = sub.add_parser("doctor", help="Report missing, broken, or stale skill links")
+    doctor.add_argument("target", nargs="?", help="Repository to inspect")
+    doctor.add_argument("--user", action="store_true", help="Inspect this machine's skill folders")
+
+    new = sub.add_parser("new", help="Scaffold a skill and its eval file")
+    new.add_argument("id")
+    new.add_argument("--category", required=True)
+
+    ev = sub.add_parser("eval", help="Print a skill's trigger prompts and first action")
+    ev.add_argument("id")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    global DRY_RUN
+    DRY_RUN = bool(getattr(args, "dry_run", False))
+    if args.command == "list":
+        cmd_list(args.json)
+    elif args.command == "check":
+        cmd_check()
+    elif args.command == "show":
+        cmd_show(args.id, args.full)
+    elif args.command == "path":
+        cmd_path(args.id)
+    elif args.command == "compose":
+        cmd_compose(args.ids)
+    elif args.command == "link":
+        cmd_link(args.target, args.user)
+    elif args.command == "unlink":
+        cmd_unlink(args.target, args.user)
+    elif args.command == "doctor":
+        cmd_doctor(args.target, args.user)
+    elif args.command == "new":
+        cmd_new(args.id, args.category)
+    elif args.command == "eval":
+        cmd_eval(args.id)
+    else:
+        parser.error(f"unknown command {args.command}")
+
+
+if __name__ == "__main__":
+    main()

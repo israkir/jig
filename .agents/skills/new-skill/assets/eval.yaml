@@ -1,0 +1,10 @@
+skill: {{id}}
+should_trigger:
+  - TODO prompt that must load this skill
+  - TODO
+  - TODO
+should_not_trigger:
+  - TODO prompt that must not load it
+  - TODO
+  - TODO
+first_action: TODO what the agent does before any edit

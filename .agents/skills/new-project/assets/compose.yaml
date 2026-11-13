@@ -1,0 +1,28 @@
+# Local Postgres for {{title}}. Listens on 127.0.0.1 only.
+# The role, database, and schema are {{db}}. The password is the same token.
+
+name: {{slug}}
+
+services:
+  postgres:
+    image: docker.io/library/postgres:18
+    container_name: {{slug}}-postgres
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      APP_DB_NAME: {{db}}
+      APP_DB_PASSWORD: {{db}}
+    volumes:
+      - pg:/var/lib/postgresql
+      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pg:

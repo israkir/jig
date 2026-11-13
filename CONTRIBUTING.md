@@ -1,161 +1,99 @@
-# Contributing to israkir-prompts
+# Contributing to jig
 
-Thank you for helping improve reusable coding-agent prompt templates. This document covers how to add or change prompts, keep the catalog in sync, and open pull requests.
+Thanks for improving these standards. The contract for each one lives under `.agents/skills/`. Every agent reads that directory.
 
----
-
-## What belongs in this repo
+## What belongs here
 
 | In scope | Out of scope |
-|----------|--------------|
-| Standalone `.md` prompt briefs agents can run without extra context | One-off chat snippets tied to a single private project |
-| CLI and manifest changes that support discovery/composition | Heavy automation frameworks or agent runtimes |
-| Cursor slash commands for **this** repo (e.g. `/commit`) | Copying prompts into consumer repos when path reference works |
-| README / CONTRIBUTING updates when behavior or catalog changes | Secrets, API keys, or environment-specific paths in committed files |
+|----------|----------------|
+| A skill directory agents can run from a symlink | A second copy of the same rules for one product |
+| CLI changes for discovery and linking | A pasted prompt that restates `references/` |
+| `AGENTS.md` when maintainer workflow changes | Secrets or machine-specific paths |
 
----
+## Add a skill
 
-## Adding a new prompt
-
-### 1. Create the prompt file
-
-Path: `prompts/<category>/<slug>.md`
-
-**Frontmatter** (required):
+Run `./bin/jig new <id> --category <category>`. It writes the `SKILL.md` and an `evals/<id>.yaml` from templates. Fill every `TODO`. `<id>` is kebab-case and matches `name`. A skill that checks an existing project against a standard uses the `audit-` prefix. Its `metadata.category` stays the subject, such as `api`.
 
 ```yaml
 ---
-id: my-prompt-id
-title: Human-readable title
-category: ux
-tags: [tag1, tag2]
-version: 1.0.0
+name: my-skill-id
+description: What it does and when to use it, in the third person. One line, at most 1024 characters.
+license: GPL-2.0
+compatibility: Cursor, Claude Code, ChatGPT Codex, and Antigravity via .agents/skills.
+metadata:
+  version: "1.0.0"
+  category: ux
+  tags: tag1,tag2
 ---
 ```
 
-**Body** — write a complete task brief:
+Put convention tables in `references/`. Put templates in `assets/`. The procedure cites those paths in backticks, for example `` `references/rest-rules.md` ``. `./bin/jig check` verifies the paths exist.
 
-- **Role** — who the agent is pretending to be
-- **Scope** — in/out of scope, explicit boundaries
-- **Phases** — for audits, prefer **Phase A (discovery) → Phase B (plan & implement) → Phase C (verify)**
-- **Acceptance criteria** — how the agent knows it is done
-- **Constraints** — ask before large refactors; inventory before code changes
+Keep `SKILL.md` as steps: new project versus existing project, then inventory, then edits, then a command to run. Record app-specific exceptions in that repo's `AGENTS.md`. Do not instruct the agent to paste the reference into README or a tool rule.
 
-Adapt the structure of existing prompts in the same category.
+Set `metadata.distribute: "false"` when the skill applies only to this catalog (see `commit`).
 
-### 2. Register in `manifest.yaml`
+`description` starts with a third-person verb and says "Use when ...". Keep `SKILL.md` under 500 lines. A skill with `disable-model-invocation: true` also needs `agents/openai.yaml`. Every distributed skill has `evals/<id>.yaml`: three prompts that must load it, three that must not, and the first action.
 
-Add an entry under `prompts:` with the **same `id`** as frontmatter:
+Then:
 
-```yaml
-  - id: my-prompt-id
-    path: prompts/ux/my-prompt-id.md
-    title: Human-readable title
-    category: ux
-    tags: [tag1, tag2]
+```bash
+./bin/jig check
+python3 -m unittest discover tests
+./bin/jig eval my-skill-id
 ```
 
-### 3. Update documentation
+Add a row to the README standards table.
 
-- Add a row to the **Prompt Catalog** table in `README.md`.
-- Run `./bin/israkir-prompt list` and `./bin/israkir-prompt show my-prompt-id` to verify resolution.
+## Change a skill
 
-### 4. Versioning
+1. Edit the reference for a rule change, or `SKILL.md` for a procedure change.
+2. Bump `metadata.version` when behavior changes (minor or major). Typos are a patch.
+3. Run `./bin/jig check`.
 
-- New prompt: start at `version: 1.0.0`.
-- Material scope or behavior change: bump minor (`1.1.0`) or major (`2.0.0`) in frontmatter.
-- Typos / clarifications only: patch (`1.0.1`).
+Published `name` values stay stable. The setup skill is `new-project`. The API audit is `audit-restful-api`.
 
-**Never rename or reuse a published `id`** — downstream automation and `CLAUDE.md` one-liners depend on stable ids.
+## CLI
 
----
+`bin/jig` is Python 3, standard library only.
 
-## Conventions
+| Command | Purpose |
+|---------|---------|
+| `list` | Print id, category, and description from frontmatter |
+| `check` | Names, descriptions, cited paths, and a single `.agents/skills` tree |
+| `show <id>` | Print the procedure |
+| `show --full <id>` | Procedure plus references and assets |
+| `path <id>` | Print the `SKILL.md` path |
+| `compose <id>…` | Print a run order of paths |
+| `link <dir>` | Symlink distributed skills into that repo and point `.claude/skills` at them |
+| `link --user` | Symlink distributed skills for Cursor, Claude Code, Codex, and Antigravity on this machine |
+| `link --dry-run` | Print the plan and write nothing |
+| `unlink [--user\|<dir>]` | Remove only links and copies that point into jig |
+| `doctor [--user\|<dir>]` | Report missing, broken, or stale links and the fix command |
+| `new <id> --category <c>` | Scaffold a skill and its eval file |
+| `eval <id>` | Print the skill's trigger prompts and expected first action |
+| `list --json` | Catalog as JSON |
 
-| Field | Rule |
-|-------|------|
-| `id` | kebab-case, stable forever once published |
-| `category` | Broad grouping: `ux`, `api`, `dev`, `security`, `refactoring`, … |
-| `tags` | Lowercase, searchable keywords |
-| File path | `prompts/<category>/<slug>.md` — slug usually matches `id` |
-| Body | Self-contained; no “see our internal wiki” dependencies |
+Where symlinks are unavailable (Windows without Developer Mode), `link` copies the skill and marks it with `.jig-copy`. `doctor` reports a stale copy; re-run `link` to refresh it.
 
-**Prompt style**
+## Pull requests
 
-- Prefer questions and suggestions over commands when reviewing human-written code (audit prompts).
-- Separate what agents should catch vs. what linters/CI already enforce.
-- Use tables and checklists for inventories; use phased headings for execution order.
+- [ ] `./bin/jig check` passes
+- [ ] `python3 -m unittest discover tests` passes
+- [ ] new skill has an `evals/<id>.yaml`
+- [ ] `name` matches the directory
+- [ ] version bumped when behavior changed
+- [ ] no second copy of a reference in the README or a tool-specific rule
+- [ ] no secrets
 
----
+Commit messages follow the [`commit` skill](.agents/skills/commit/SKILL.md). Branch, squash, and PR drafts are the `create-branch`, `squash`, and `draft-pr-msg` skills. Commit and push only when asked.
 
-## Changing existing prompts
-
-1. Edit `prompts/<category>/<slug>.md`.
-2. Bump `version` in frontmatter if behavior or scope changed materially.
-3. Update `manifest.yaml` only if `id`, `path`, `title`, `category`, or `tags` changed.
-4. Note breaking changes in the PR description (e.g. removed phases, narrower scope).
-
----
-
-## CLI (`bin/israkir-prompt`)
-
-The CLI uses Python 3 stdlib only. If you change commands or manifest parsing:
-
-- Update `usage()` in `bin/israkir-prompt`.
-- Smoke-test: `list`, `show <id>`, `compose <id> <id>`, `path <id>`.
-- Document new subcommands in `README.md`.
-
----
-
-## Cursor commands
-
-Slash commands live in `.cursor/commands/`. If you add one:
-
-- Use a short, action-oriented name (`commit.md` → `/commit`).
-- Document it in `README.md` under Usage.
-- Keep commands **approval-first** when they run git write operations.
-
----
-
-## Pull request checklist
-
-Before opening a PR:
-
-- [ ] `id` in frontmatter matches `manifest.yaml`
-- [ ] `./bin/israkir-prompt list` shows the new/changed entry
-- [ ] `./bin/israkir-prompt show <id>` prints the expected body (no frontmatter in output)
-- [ ] README catalog table updated if catalog changed
-- [ ] `version` bumped when prompt behavior/scope changed materially
-- [ ] No secrets or machine-specific absolute paths committed
-
-**Commit messages** — [Conventional Commits](https://www.conventionalcommits.org/) preferred:
-
+```text
+feat(skills): add a security-headers standard
+fix(api): clarify hypermedia examples in the REST contract
+docs: point the README at jig list
 ```
-feat(prompts): add security-headers-audit template
-fix(api): clarify hypermedia examples in restful-api-design-audit
-docs: update README usage for Claude.ai Projects
-```
-
-In this repo you can run **`/commit`** in Cursor to draft a Conventional Commit proposal (approve explicitly before staging).
-
----
-
-## Ideas welcome
-
-- New categories: security, refactoring, testing, documentation, observability
-- Framework-specific variants (e.g. Next.js timestamp patterns, FastAPI REST audit)
-- Additional CLI helpers (validate manifest, count lines, lint frontmatter)
-- Translations of prompt bodies (separate files or clearly labeled sections)
-- More Cursor slash commands for maintainers
-
----
-
-## Questions
-
-Open a [GitHub issue](https://github.com/israkir/israkir-prompts/issues) for design questions before large prompts. For small fixes, a PR with a short description is fine.
-
----
 
 ## License
 
-By contributing, you agree that your contributions are licensed under the same [GPL-2.0](LICENSE) license as the project.
+Contributions are licensed under the same [GPL-2.0](LICENSE) license as the project.

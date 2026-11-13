@@ -1,0 +1,10 @@
+skill: audit-restful-api
+should_trigger:
+  - Audit this API against the REST standard.
+  - Check our routes and status codes.
+  - Are our error responses problem+json?
+should_not_trigger:
+  - Add a new endpoint for invoices.
+  - Set up a new project.
+  - Audit the agent setup.
+first_action: Read references/rest-rules.md, build the audit table, and stop for approval before editing.
