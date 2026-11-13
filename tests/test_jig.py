@@ -19,7 +19,16 @@ jig = importlib.util.module_from_spec(_spec)
 sys.modules["jig"] = jig
 _loader.exec_module(jig)
 
-SYMLINKS = hasattr(os, "symlink")
+def _can_symlink() -> bool:
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            os.symlink(tmp, os.path.join(tmp, "probe"))
+        except (OSError, NotImplementedError):
+            return False
+    return True
+
+
+SYMLINKS = _can_symlink()
 
 
 def run(*argv: str) -> tuple[int, str]:
@@ -118,7 +127,7 @@ class Linking(unittest.TestCase):
         run("link", str(self.project))
         mine = self.project / ".agents" / "skills" / "mine"
         mine.mkdir()
-        (mine / "SKILL.md").write_text("x")
+        (mine / "SKILL.md").write_text("x", encoding="utf-8")
         run("unlink", str(self.project))
         self.assertTrue(mine.is_dir())
         for name in self.distributed():
@@ -136,7 +145,7 @@ class Scaffold(unittest.TestCase):
         code, _ = run("new", "zz-demo", "--category", "dev")
         self.assertEqual(code, 0)
         self.assertTrue((skill_dir / "SKILL.md").is_file())
-        self.assertIn("zz-demo", eval_file.read_text())
+        self.assertIn("zz-demo", eval_file.read_text(encoding="utf-8"))
         self.assertEqual(run("new", "zz-demo", "--category", "dev")[0], 1)
 
 

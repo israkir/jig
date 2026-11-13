@@ -112,7 +112,7 @@ def load_skills() -> tuple[list[Skill], list[str]]:
             errors.append(f"{directory.name}: missing SKILL.md")
             continue
         try:
-            meta, body = parse_frontmatter(skill_md.read_text())
+            meta, body = parse_frontmatter(skill_md.read_text(encoding="utf-8"))
         except ValueError as exc:
             errors.append(f"{skill_md.relative_to(ROOT)}: {exc}")
             continue
@@ -209,7 +209,7 @@ def cmd_show(skill_id: str, full: bool) -> None:
     for path in bundle_files(skill):
         rel = path.relative_to(skill.directory)
         print(f"\n\n---\n\n# {skill.name} / {rel}\n")
-        print_body(path.read_text())
+        print_body(path.read_text(encoding="utf-8"))
 
 
 def is_copy(path: Path) -> bool:
@@ -220,7 +220,7 @@ def copy_skill(source: Path, dest: Path) -> None:
     if dest.exists():
         shutil.rmtree(dest)
     shutil.copytree(source, dest)
-    (dest / COPY_MARKER).write_text(f"copied from {source}\n")
+    (dest / COPY_MARKER).write_text(f"copied from {source}\n", encoding="utf-8")
 
 
 def link_symlink(source: Path, dest: Path) -> str:
@@ -428,7 +428,7 @@ def diagnose(directory: Path, skills: list[Skill]) -> list[str]:
             elif entry.resolve() != skill.directory.resolve():
                 problems.append(f"{entry}: points somewhere other than jig")
         elif is_copy(entry):
-            if (entry / "SKILL.md").read_text() != skill.skill_md.read_text():
+            if (entry / "SKILL.md").read_text(encoding="utf-8") != skill.skill_md.read_text(encoding="utf-8"):
                 problems.append(f"{entry}: stale copy")
         elif entry.exists():
             problems.append(f"{entry}: a real directory, not a jig link")
@@ -470,16 +470,16 @@ def cmd_new(skill_id: str, category: str) -> None:
     values = {"{{id}}": skill_id, "{{category}}": category}
 
     def fill(name: str) -> str:
-        text = (template / name).read_text()
+        text = (template / name).read_text(encoding="utf-8")
         for key, value in values.items():
             text = text.replace(key, value)
         return text
 
     directory.mkdir(parents=True)
-    (directory / "SKILL.md").write_text(fill("SKILL.md"))
+    (directory / "SKILL.md").write_text(fill("SKILL.md"), encoding="utf-8")
     (directory / "references").mkdir()
     eval_file.parent.mkdir(exist_ok=True)
-    eval_file.write_text(fill("eval.yaml"))
+    eval_file.write_text(fill("eval.yaml"), encoding="utf-8")
     print(f"created {directory.relative_to(ROOT)}/SKILL.md")
     print(f"created {eval_file.relative_to(ROOT)}")
     print("Replace every TODO, add a README row, then run ./bin/jig check.")
@@ -490,14 +490,14 @@ def cmd_eval(skill_id: str) -> None:
     path = ROOT / "evals" / f"{skill_id}.yaml"
     if not path.is_file():
         die([f"missing evals/{skill_id}.yaml"])
-    print_body(path.read_text())
+    print_body(path.read_text(encoding="utf-8"))
 
 
 def validate_readme(skills: list[Skill]) -> list[str]:
     readme = ROOT / "README.md"
     if not readme.is_file():
         return ["missing README.md"]
-    text = readme.read_text()
+    text = readme.read_text(encoding="utf-8")
     listed = set(re.findall(r"\.agents/skills/([a-z0-9-]+)/SKILL\.md", text))
     wanted = {skill.name for skill in skills if skill.distributed and skill.category != "repo"}
     errors = [f"README.md: no row for skill {name}" for name in sorted(wanted - listed)]
@@ -530,7 +530,7 @@ def validate_skill(skill: Skill) -> list[str]:
         errors.append(f"{rel}: description must start with a third-person verb")
     if skill.description and not DESCRIPTION_RE.search(skill.description):
         errors.append(f"{rel}: description must say when to use it ('Use when ...')")
-    lines = skill.skill_md.read_text().count("\n") + 1
+    lines = skill.skill_md.read_text(encoding="utf-8").count("\n") + 1
     if lines > MAX_SKILL_LINES:
         errors.append(f"{rel}: {lines} lines; keep SKILL.md under {MAX_SKILL_LINES}")
     if str(skill.meta.get("disable-model-invocation", "")).lower() == "true":
@@ -546,7 +546,7 @@ def cmd_check() -> None:
     for skill in skills:
         errors.extend(validate_skill(skill))
     errors.extend(validate_readme(skills))
-    claude_md = (ROOT / "CLAUDE.md").read_text().strip() if (ROOT / "CLAUDE.md").is_file() else ""
+    claude_md = (ROOT / "CLAUDE.md").read_text(encoding="utf-8").strip() if (ROOT / "CLAUDE.md").is_file() else ""
     if claude_md != "@AGENTS.md":
         errors.append("CLAUDE.md must contain only @AGENTS.md")
     if not (ROOT / "AGENTS.md").is_file():
@@ -617,6 +617,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> None:
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     parser = build_parser()
     args = parser.parse_args(argv)
     global DRY_RUN
