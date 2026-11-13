@@ -22,7 +22,7 @@ license: GPL-2.0
 compatibility: Cursor, Claude Code, ChatGPT Codex, and Antigravity via .agents/skills.
 metadata:
   version: "1.0.0"
-  category: ux
+  category: dev
   tags: tag1,tag2
 ---
 ```
@@ -63,8 +63,6 @@ Published `name` values stay stable. The setup skill is `new-project`. The API a
 | `check` | Names, descriptions, cited paths, and a single `.agents/skills` tree |
 | `show <id>` | Print the procedure |
 | `show --full <id>` | Procedure plus references and assets |
-| `path <id>` | Print the `SKILL.md` path |
-| `compose <id>…` | Print a run order of paths |
 | `link <dir>` | Symlink distributed skills into that repo and point `.claude/skills` at them |
 | `link --user` | Symlink distributed skills for Cursor, Claude Code, Codex, and Antigravity on this machine |
 | `link --dry-run` | Print the plan and write nothing |

@@ -45,4 +45,4 @@ Commit and push only when asked. One name per action. The procedure is `.agents/
 | `squash` | `/squash` | `$squash` | `@squash` |
 | `draft-pr-msg` | `/draft-pr-msg` | `$draft-pr-msg` | `@draft-pr-msg` |
 
-[`.gitmessage`](.gitmessage) is the human commit template. An agent follows the `commit` skill, including its rule against trailers.
+Commit messages follow the `commit` skill, including its rule against trailers.

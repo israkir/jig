@@ -5,7 +5,7 @@ license: GPL-2.0
 compatibility: Cursor, Claude Code, ChatGPT Codex, and Antigravity. Invoked by name.
 disable-model-invocation: true
 metadata:
-  version: "1.3.1"
+  version: "1.3.2"
   category: repo
   tags: git,commit
   distribute: "false"
@@ -13,7 +13,7 @@ metadata:
 
 # Commit
 
-You are preparing a **git commit** for the **jig** repository — conventions and standards for agentic development (`.agents/skills/`, `bin/jig`, `AGENTS.md`, `README.md`, `.gitmessage`).
+You are preparing a **git commit** for the **jig** repository — conventions and standards for agentic development (`.agents/skills/`, `bin/jig`, `AGENTS.md`, `README.md`).
 
 **Hooks:** There is **no** `.pre-commit-config.yaml` in this repo today. If one appears later, read it and follow what it runs on `git commit` / `git push`.
 
@@ -22,6 +22,7 @@ You are preparing a **git commit** for the **jig** repository — conventions an
 - **`./bin/jig check`** — skills and cited contracts.
 - **`./bin/jig list`** — catalog from `SKILL.md` frontmatter.
 - **`./bin/jig show <id>`** — body of a changed skill.
+- **`python3 -m unittest discover tests`** — CLI tests.
 - **`python3 -m py_compile bin/jig`** — when `bin/jig` changed.
 - There is **no** Makefile. Do not invent `make` targets.
 
@@ -47,6 +48,7 @@ From repo root, as applicable:
 - **`./bin/jig check`**
 - **`./bin/jig list`**
 - **`./bin/jig show <id>`** for each changed skill
+- **`python3 -m unittest discover tests`**
 - **`python3 -m py_compile bin/jig`** when the CLI changed
 
 If `.pre-commit-config.yaml` exists at commit time, stage intended files and run **`pre-commit run`** (or **`pre-commit run --all-files`**) per that config.

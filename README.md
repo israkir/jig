@@ -136,10 +136,9 @@ Each standard is a skill: a short procedure plus a contract in `references/`. Th
 | Web | Node.js 20.9 or newer, and the npm shipped with it |
 | Database | Docker or Podman. Postgres 18 runs in a container on `127.0.0.1` |
 
-Library floors are the newest set that install together. A package manager may select a newer release above a floor. The files are [`apps/api/pyproject.toml`](./.agents/skills/new-project/assets/api/pyproject.toml) and [`apps/web/package.json`](./.agents/skills/new-project/assets/web/package.json).
+Library floors live in one place per surface: [`apps/api/pyproject.toml`](./.agents/skills/new-project/assets/api/pyproject.toml) and [`apps/web/package.json`](./.agents/skills/new-project/assets/web/package.json). A package manager may select a newer release above a floor.
 
-| Surface | Libraries |
-|---------|-----------|
+---------|-----------|
 | API | FastAPI 0.162.4, Pydantic 2.14.3, uvicorn 0.54.0 |
 | API dev | httpx2 2.16.0, mypy 2.4.1, pytest 9.2.0, Ruff 0.17.4 |
 | Database | Alembic 1.20.1, psycopg 3.3.8, SQLAlchemy 2.1.8 |

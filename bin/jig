@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SKILLS_DIR = ROOT / ".agents" / "skills"
 NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 CITE_RE = re.compile(r"`((?:references|assets)/[^`]+)`")
-CATEGORY_ORDER = {"dev": 0, "api": 1, "agents": 2, "ux": 3, "repo": 4}
+CATEGORY_ORDER = {"dev": 0, "api": 1, "agents": 2, "repo": 3}
 ALLOWED_KEYS = {
     "name",
     "description",
@@ -210,25 +210,6 @@ def cmd_show(skill_id: str, full: bool) -> None:
         rel = path.relative_to(skill.directory)
         print(f"\n\n---\n\n# {skill.name} / {rel}\n")
         print_body(path.read_text())
-
-
-def cmd_path(skill_id: str) -> None:
-    skill = find_skill(require_skills(), skill_id)
-    print(skill.skill_md)
-
-
-def cmd_compose(ids: list[str]) -> None:
-    skills = require_skills()
-    if not ids:
-        die(["compose requires at least one skill id"])
-    chosen = [find_skill(skills, skill_id) for skill_id in ids]
-    print(
-        "Run these skills in order. Read each SKILL.md. "
-        "Open references/ and assets/ only when that skill tells you to.\n"
-    )
-    for index, skill in enumerate(chosen, start=1):
-        print(f"{index}. {skill.name}")
-        print(f"   {skill.skill_md}")
 
 
 def is_copy(path: Path) -> bool:
@@ -570,10 +551,6 @@ def cmd_check() -> None:
         errors.append("CLAUDE.md must contain only @AGENTS.md")
     if not (ROOT / "AGENTS.md").is_file():
         errors.append("missing AGENTS.md")
-    if (ROOT / "manifest.yaml").exists():
-        errors.append("manifest.yaml duplicates SKILL.md frontmatter; delete it")
-    if (ROOT / "prompts").exists():
-        errors.append("prompts/ duplicates .agents/skills; delete it")
     for path in (
         ROOT / ".cursor" / "commands",
         ROOT / ".cursor" / "rules",
@@ -611,15 +588,6 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Also print references and assets, for a chat with no checkout",
     )
-
-    path = sub.add_parser("path", help="Print the absolute path of SKILL.md")
-    path.add_argument("id")
-
-    compose = sub.add_parser(
-        "compose",
-        help="Print a run order of skill paths, without inlining the files",
-    )
-    compose.add_argument("ids", nargs="+")
 
     link = sub.add_parser("link", help="Symlink skills into a repo's .agents/skills")
     link.add_argument("target", nargs="?", help="Existing repository")
@@ -659,10 +627,6 @@ def main(argv: list[str] | None = None) -> None:
         cmd_check()
     elif args.command == "show":
         cmd_show(args.id, args.full)
-    elif args.command == "path":
-        cmd_path(args.id)
-    elif args.command == "compose":
-        cmd_compose(args.ids)
     elif args.command == "link":
         cmd_link(args.target, args.user)
     elif args.command == "unlink":
