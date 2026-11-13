@@ -222,8 +222,7 @@ def link_target(source: Path, dest: Path) -> str:
 
 def points_to(dest: Path, source: Path) -> bool:
     """True when the symlink dest resolves to source, however the target is spelled."""
-    target = Path(os.path.normpath(dest.parent.resolve() / os.readlink(dest)))
-    return target == source.resolve()
+    return Path(os.path.realpath(dest)) == Path(os.path.realpath(source))
 
 
 def is_copy(path: Path) -> bool:
@@ -277,9 +276,8 @@ def owned_by_jig(child: Path) -> bool:
         return True
     if not child.is_symlink():
         return False
-    target = Path(os.path.normpath(child.parent.resolve() / os.readlink(child)))
     try:
-        target.relative_to(SKILLS_DIR.resolve())
+        Path(os.path.realpath(child)).relative_to(Path(os.path.realpath(SKILLS_DIR)))
     except ValueError:
         return False
     return True
