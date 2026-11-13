@@ -212,6 +212,20 @@ def cmd_show(skill_id: str, full: bool) -> None:
         print_body(path.read_text(encoding="utf-8"))
 
 
+def link_target(source: Path, dest: Path) -> str:
+    """Relative path from dest's folder to source. Absolute across drives (Windows)."""
+    try:
+        return os.path.relpath(source.resolve(), dest.parent.resolve())
+    except ValueError:
+        return str(source.resolve())
+
+
+def points_to(dest: Path, source: Path) -> bool:
+    """True when the symlink dest resolves to source, however the target is spelled."""
+    target = Path(os.path.normpath(dest.parent.resolve() / os.readlink(dest)))
+    return target == source.resolve()
+
+
 def is_copy(path: Path) -> bool:
     return path.is_dir() and not path.is_symlink() and (path / COPY_MARKER).is_file()
 
@@ -224,9 +238,9 @@ def copy_skill(source: Path, dest: Path) -> None:
 
 
 def link_symlink(source: Path, dest: Path) -> str:
-    relative = os.path.relpath(source.resolve(), dest.parent.resolve())
+    relative = link_target(source, dest)
     if dest.is_symlink():
-        if os.readlink(dest) == relative:
+        if points_to(dest, source):
             return "ok"
         if not DRY_RUN:
             dest.unlink()
@@ -245,7 +259,7 @@ def link_symlink(source: Path, dest: Path) -> str:
         return "would"
     dest.parent.mkdir(parents=True, exist_ok=True)
     try:
-        dest.symlink_to(relative)
+        dest.symlink_to(relative, target_is_directory=True)
     except OSError:
         copy_skill(source, dest)
         print(
@@ -300,14 +314,14 @@ def link_into(directory: Path, skills: list[Skill]) -> None:
 
 def link_directory_alias(source: Path, dest: Path) -> None:
     """Point dest at source. One symlink, so a provider sees the same skill tree."""
-    relative = os.path.relpath(source.resolve(), dest.parent.resolve())
+    relative = link_target(source, dest)
     if DRY_RUN:
-        state = "ok" if dest.is_symlink() and os.readlink(dest) == relative else "would"
+        state = "ok" if dest.is_symlink() and points_to(dest, source) else "would"
         print(f"{state:6}  {dest}")
         return
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.is_symlink():
-        if os.readlink(dest) == relative:
+        if points_to(dest, source):
             print(f"ok      {dest}")
             return
         dest.unlink()
@@ -324,7 +338,7 @@ def link_directory_alias(source: Path, dest: Path) -> None:
                 ]
             )
     try:
-        dest.symlink_to(relative)
+        dest.symlink_to(relative, target_is_directory=True)
     except OSError:
         die([f"cannot symlink {dest}. Enable symlinks (Windows Developer Mode) and retry."])
     print(f"linked  {dest}")
@@ -455,7 +469,7 @@ def cmd_doctor(target: str | None, user: bool) -> None:
         return
     for line in problems:
         print(f"  {line}")
-    print(f"Fix: {os.path.relpath(Path(__file__).resolve())} {fix.removeprefix('jig ')}")
+    print(f"Fix: {Path(__file__).resolve()} {fix.removeprefix('jig ')}")
     raise SystemExit(1)
 
 
