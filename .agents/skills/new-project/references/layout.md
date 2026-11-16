@@ -23,6 +23,10 @@ compose.yaml       database surface
 postgres/initdb/   database surface
 apps/api/          API surface
 apps/web/          web surface
+.sops.yaml         secrets surface
+.env.example       secrets surface, non-secret settings only
+secrets/           secrets surface
+infra/secrets/     secrets surface
 ```
 
 Copy only the rows for the chosen surfaces.
@@ -38,6 +42,10 @@ Copy only the rows for the chosen surfaces.
 | Web | `assets/web/` | `apps/web/` |
 | Database | `assets/compose.yaml` | `compose.yaml` |
 | Database | `assets/postgres/` | `postgres/` |
+| Secrets | `assets/secrets/sops.yaml` | `.sops.yaml` |
+| Secrets | `assets/secrets/env.example` | `.env.example` |
+| Secrets | `assets/secrets/README.md` | `secrets/README.md` |
+| Secrets | `assets/secrets/infra/` | `infra/secrets/` |
 
 When the API is copied without the database, delete `apps/api/alembic.ini`, `apps/api/alembic/`, and `apps/api/src/app/infrastructure/db.py`. In `apps/api/pyproject.toml`, delete the `# surface: database` block. In `apps/api/src/app/api/routes.py`, delete the `psycopg` import, the `JSONResponse` import, the `ping` import, and `ready`. Leave `README.md` as copied. It tells a clone which tools to install from the directories that exist.
 
@@ -80,6 +88,18 @@ One Postgres 18 container, one role, one database, and one schema. The role, dat
 
 Bind `127.0.0.1:5432` only. Add Redis, Mongo, or TimescaleDB when the user asks for a queue, a document store, or time-series tables. The TimescaleDB image used by the family is `docker.io/timescale/timescaledb:2.31.0-pg18`.
 
+## Secrets
+
+Copy this surface only when the user asks for secrets, production deployment, or SOPS. A new project that names no surface does not get it.
+
+The standard is `../audit-secrets/references/secrets-contract.md`. Cite it from the project's `AGENTS.md`. Do not paste it.
+
+SOPS + age holds real credentials. The loopback starter password stays in Compose and is not a store entry. Local and production are different files: `secrets/local.enc.yaml` and `secrets/production.enc.yaml`. `.sops.yaml` gives them different recipients. Do not generate a private key. Do not commit a decrypted store.
+
+Append the lines in `assets/secrets/gitignore.lines` to `.gitignore` when they are absent. Add the Secrets targets from `references/makefile.md`, and add `secrets-scan` to `check`.
+
+When the API and the database are both present, replace `apps/api/src/app/infrastructure/db.py` with `assets/secrets/db.py` and copy `assets/secrets/test_database_url.py` to `apps/api/tests/test_database_url.py`. Keep `DATABASE_URL` in the schema. When the database surface is absent, remove `DATABASE_URL` from `OWN` in `infra/secrets/secret_store.py`.
+
 ## AGENTS.md
 
 `assets/AGENTS.md` is the starter. Set `{{surfaces}}` to the surfaces that were created. Add these rules when the surface exists:
@@ -87,5 +107,6 @@ Bind `127.0.0.1:5432` only. Add Redis, Mongo, or TimescaleDB when the user asks 
 - API: domain code imports no framework and does no IO. HTTP lives in `app/api`. Postgres lives in `app/infrastructure`. Ruff line length is 100, and `uv run mypy` stays clean for `app`. The API listens on `127.0.0.1:8000`. A timestamp field's name states the moment: event, source publication, time this API served the payload, or a user action.
 - Web: the web app listens on `127.0.0.1:3000`. Browser calls go through this app's route handlers. A visible time states its kind and, unless it is the user's own action, its source.
 - Database: the database name, role, and schema are `{{db}}` on `127.0.0.1:5432`. A host other than loopback is refused. Schema changes go through Alembic, and an applied revision is not edited.
+- Secrets: under Verify, cite `.agents/skills/audit-secrets/references/secrets-contract.md`. `APP_ENV` is unset or `production`. Unset keeps the loopback starter password, which is not in the store. `production` refuses that password, a missing `DATABASE_URL`, and a database URL without `sslmode=verify-full`. Agents do not read the age key, decrypt the store, or print secret values.
 
 Do not copy this reference into `AGENTS.md`.

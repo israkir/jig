@@ -1,12 +1,12 @@
 ---
 name: new-project
-description: Scaffolds a minimal working API, web app, database, or any combination of them, with the shared layout and the colored Makefile, then links the project so every agent can read the jig skills. Use when the user asks to start a project or to add one of those surfaces.
+description: Scaffolds a minimal working API, web app, database, or any combination of them, with the shared layout and the colored Makefile, and SOPS with age when secrets are requested, then links the project so every agent can read the jig skills. Use when the user asks to start a project or to add one of those surfaces.
 license: GPL-2.0
 compatibility: Cursor, Claude Code, ChatGPT Codex, and Antigravity via .agents/skills.
 metadata:
-  version: "1.4.0"
+  version: "1.5.0"
   category: dev
-  tags: project,scaffold,makefile,fastapi,nextjs,postgres
+  tags: project,scaffold,makefile,fastapi,nextjs,postgres,sops
 ---
 
 # New project
@@ -23,8 +23,9 @@ Use what the user named.
 | API, backend, or FastAPI | API |
 | Frontend, web, or Next.js | Web |
 | Database or Postgres | Database |
+| Secrets, production deployment, or SOPS | Secrets |
 
-A named subset is the whole job. Do not add a surface they left out.
+A named subset is the whole job. Do not add a surface they left out. A new project that names no surface gets API, web, and database, and does not get Secrets.
 
 ## Names
 
@@ -40,6 +41,7 @@ The repository has none of these surfaces yet.
 4. Write `AGENTS.md` from `assets/AGENTS.md` and `CLAUDE.md` from `assets/CLAUDE.md`. Replace `{{surfaces}}` with the chosen surfaces. Keep the Commands, Verify, Conventions, and Exceptions sections.
 5. Copy `assets/gitignore` to `.gitignore` and `assets/README.md` to `README.md`.
 6. `chmod +x postgres/initdb/00-init-database.sh` when the database surface is included.
+7. When the secrets surface is included, copy it from the map in `references/layout.md`. Append `assets/secrets/gitignore.lines` to `.gitignore`. Add the Secrets targets from `references/makefile.md`. Do not generate a private key.
 
 ## Existing repository
 
@@ -56,5 +58,6 @@ From the repository root, run `make help` and confirm only the chosen surfaces a
 - API: `cd apps/api && uv sync && uv run pytest`
 - Web: `cd apps/web && npm install && npm run typecheck && npm test`
 - Database, when the API is present: `make storage-up && make be-migrate`
+- Secrets: `make check` runs `python3 infra/secrets/check_store.py`. Do not run `secrets-view`.
 
 Report the commands you ran and any failure. Do not describe a command you did not run as done.

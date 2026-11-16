@@ -64,4 +64,46 @@ The container runtime is `docker` when `docker version` succeeds, otherwise `pod
 | API | Every `be-*` target, the API help group, and `be-dev` from the quick start. Point `install`, `lint`, and `test` at the web targets only. `storage-reset` stops after recreating the schema |
 | Database | `storage-up`, `storage-down`, `storage-reset`, `be-migrate`, the database help group, and the `storage-up` quick-start line |
 
-When web and API are both absent, delete `install`, `lint`, `test`, and `check` as well.
+When web and API are both absent, delete `install`, `lint`, `test`, and `check` as well. When the secrets surface is present and those two are absent, `check` is `secrets-scan`.
+
+## Secrets
+
+Add this group only when the secrets surface was chosen. Add `C_SEC_KEY := \033[1;31m` next to the other color variables, and clear it in the `NO_COLOR` branch. Add the names to `.PHONY`. Insert the help lines inside `help`, after the Database group and before Quick start. Add `secrets-scan` to `check`. `check` does not decrypt. `secrets-check`, `secrets-edit`, `secrets-view`, and `secrets-run` do. `secrets-view` prints values. An agent does not run it.
+
+```makefile
+	@printf '%b\n' "$(C_SEC_KEY)Secrets:$(C_RESET)"
+	@printf '%b\n' "  $(C_SEC_KEY)secrets-scan$(C_RESET)$(C_DIM)       Fail on a plaintext store or an age private key$(C_RESET)"
+	@printf '%b\n' "  $(C_SEC_KEY)secrets-check$(C_RESET)$(C_DIM)      Decrypt and print variable names only$(C_RESET)"
+	@printf '%b\n' "  $(C_SEC_KEY)secrets-edit$(C_RESET)$(C_DIM)       Edit the local store with sops$(C_RESET)"
+	@printf '%b\n' "  $(C_SEC_KEY)secrets-view$(C_RESET)$(C_DIM)       Print decrypted values. Agents do not run this$(C_RESET)"
+	@printf '%b\n' "  $(C_SEC_KEY)secrets-updatekeys$(C_RESET)$(C_DIM) Re-key after changing recipients$(C_RESET)"
+	@printf '%b\n' "  $(C_SEC_KEY)secrets-recipients$(C_RESET)$(C_DIM) Warn when the local store has one recipient$(C_RESET)"
+	@printf '%b\n' "  $(C_SEC_KEY)secrets-run$(C_RESET)$(C_DIM)        Run CMD with the local store in its environment$(C_RESET)"
+```
+
+```makefile
+secrets-scan:
+	python3 infra/secrets/check_store.py
+	python3 infra/secrets/test_secret_store.py
+
+secrets-check:
+	python3 infra/secrets/export_env.py app --names
+
+secrets-edit:
+	SOPS_AGE_KEY_FILE="$${SOPS_AGE_KEY_FILE:-$(HOME)/.config/sops/age/keys.txt}" sops secrets/local.enc.yaml
+
+secrets-view:
+	SOPS_AGE_KEY_FILE="$${SOPS_AGE_KEY_FILE:-$(HOME)/.config/sops/age/keys.txt}" sops decrypt secrets/local.enc.yaml
+
+secrets-updatekeys:
+	SOPS_AGE_KEY_FILE="$${SOPS_AGE_KEY_FILE:-$(HOME)/.config/sops/age/keys.txt}" sops updatekeys secrets/local.enc.yaml
+	@if [ -f secrets/production.enc.yaml ]; then \
+		SOPS_AGE_KEY_FILE="$${SOPS_AGE_KEY_FILE:-$(HOME)/.config/sops/age/keys.txt}" sops updatekeys secrets/production.enc.yaml; \
+	fi
+
+secrets-recipients:
+	python3 infra/secrets/export_env.py --recipients || [ $$? -eq 3 ]
+
+secrets-run:
+	python3 infra/secrets/export_env.py app -- $(CMD)
+```

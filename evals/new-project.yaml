@@ -3,6 +3,7 @@ should_trigger:
   - Start a new project called Northwind with an API and a database.
   - Scaffold a Next.js frontend for this repo.
   - Add a Postgres database to this project.
+  - Add SOPS secrets management to this project.
 should_not_trigger:
   - Fix the failing test in apps/api.
   - Explain what the Makefile does.

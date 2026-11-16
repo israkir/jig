@@ -122,6 +122,11 @@ Setup, then API.
       <td><a href="./.agents/skills/audit-tests/SKILL.md"><code>audit-tests</code></a></td>
       <td>An existing suite is audited against the testing standard. <a href="./.agents/skills/audit-tests/references/testing-contract.md">Standard</a>.</td>
     </tr>
+    <tr>
+      <td>6</td>
+      <td><a href="./.agents/skills/audit-secrets/SKILL.md"><code>audit-secrets</code></a></td>
+      <td>Secrets are SOPS + age: a schema, in-memory injection, and a separate production store. <a href="./.agents/skills/audit-secrets/references/secrets-contract.md">Standard</a>.</td>
+    </tr>
   </tbody>
 </table>
 
