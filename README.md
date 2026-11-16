@@ -63,16 +63,43 @@ git clone https://github.com/israkir/jig.git "$env:USERPROFILE\git\jig"
 python "$env:USERPROFILE\git\jig\bin\jig" link --user
 ```
 
-The same words work in Cursor, Claude Code, Codex, and Antigravity.
+The same words work in Cursor, Claude Code, Codex, and Antigravity. Name the skill, then say what you want.
+
+**New project.** `new-project` scaffolds the surfaces you name and links the project to jig. Name no surface and you get an API, a web app, and a database.
 
 | You want | Say this |
 |----------|----------|
-| Start a project | `Use the new-project skill. The project name is Northwind. I need an API and a database.` |
-| Check a project | `Use the audit-restful-api skill. Audit this project.` |
+| API and a database | `Use the new-project skill. The project name is Northwind. I need an API and a database.` |
+| A web app | `Use the new-project skill. The project name is Northwind. I need a web app.` |
+| API, web, and a database | `Use the new-project skill. The project name is Northwind.` |
+| Secrets as well | `Use the new-project skill. The project name is Northwind. I need an API, a database, and secrets.` |
+| A database on this repo | `Use the new-project skill. Add a database to this project.` |
+
+**Audit.** A skill whose name starts with `audit-` compares the project with one standard and waits before it edits.
+
+| You want | Say this |
+|----------|----------|
+| Where a module lives | `Use the audit-source-structure skill. Where does a new route belong?` |
+| The HTTP API | `Use the audit-restful-api skill. Audit the order routes.` |
+| The agent setup | `Use the audit-agent-setup skill. Audit this project.` |
+| The test suite | `Use the audit-tests skill. Audit this project.` |
+| Secrets | `Use the audit-secrets skill. Audit this project.` |
+| The database | `Use the audit-database skill. Check the orders schema.` |
+
+**Other work.** `write-tests` adds one test for one named break: `Use the write-tests skill. A missing order should return 404. Write the test.`
+
+Commit, branch, squash, and the pull request draft stay in this repository. The prefix depends on the agent.
+
+| You want | Cursor, Claude Code, Antigravity | Codex | ChatGPT |
+|----------|----------------------------------|-------|---------|
+| Commit | `/commit` | `$commit` | `@commit` |
+| A branch | `/create-branch` | `$create-branch` | `@create-branch` |
+| Squash the last 3 commits | `/squash` the last 3 commits | `$squash` the last 3 commits | `@squash` the last 3 commits |
+| A pull request message | `/draft-pr-msg` | `$draft-pr-msg` | `@draft-pr-msg` |
 
 Run `~/git/jig/bin/jig doctor --user` any time to confirm every agent sees the skills. It names the broken link and the command that fixes it. `jig link --dry-run` previews a link and `jig unlink` removes only what jig made.
 
-`new-project` creates the project and links it to jig. A skill whose name starts with `audit-` compares the project with a standard and waits before it edits. `jig list` prints the skills.
+`jig list` prints the skills.
 
 To carry the skills inside one repository, for the people who clone it:
 
@@ -86,7 +113,7 @@ To carry the skills inside one repository, for the people who clone it:
 
 ### &#127760; Standards
 
-Setup, then API.
+Setup and source layout, then API.
 
 <table>
   <thead>
@@ -104,31 +131,36 @@ Setup, then API.
     </tr>
     <tr>
       <td>2</td>
+      <td><a href="./.agents/skills/audit-source-structure/SKILL.md"><code>audit-source-structure</code></a></td>
+      <td>Where a module lives: service directories, the Python package, API layers, and the Next.js tree. <a href="./.agents/skills/audit-source-structure/references/source-structure.md">Standard</a>.</td>
+    </tr>
+    <tr>
+      <td>3</td>
       <td><a href="./.agents/skills/audit-restful-api/SKILL.md"><code>audit-restful-api</code></a></td>
       <td>An existing API is audited against the REST standard. <a href="./.agents/skills/audit-restful-api/references/rest-rules.md">Standard</a>.</td>
     </tr>
     <tr>
-      <td>3</td>
+      <td>4</td>
       <td><a href="./.agents/skills/audit-agent-setup/SKILL.md"><code>audit-agent-setup</code></a></td>
       <td>A project's own agent setup is audited: one <code>AGENTS.md</code>, one skills tree, one verify command. <a href="./.agents/skills/audit-agent-setup/references/agent-setup-rules.md">Standard</a>.</td>
     </tr>
     <tr>
-      <td>4</td>
+      <td>5</td>
       <td><a href="./.agents/skills/write-tests/SKILL.md"><code>write-tests</code></a></td>
       <td>Tests guard one named break in product behaviour, at the cheapest tier that can catch it. <a href="./.agents/skills/audit-tests/references/testing-contract.md">Standard</a>.</td>
     </tr>
     <tr>
-      <td>5</td>
+      <td>6</td>
       <td><a href="./.agents/skills/audit-tests/SKILL.md"><code>audit-tests</code></a></td>
       <td>An existing suite is audited against the testing standard. <a href="./.agents/skills/audit-tests/references/testing-contract.md">Standard</a>.</td>
     </tr>
     <tr>
-      <td>6</td>
+      <td>7</td>
       <td><a href="./.agents/skills/audit-secrets/SKILL.md"><code>audit-secrets</code></a></td>
       <td>Secrets are SOPS + age: a schema, in-memory injection, and a separate production store. <a href="./.agents/skills/audit-secrets/references/secrets-contract.md">Standard</a>.</td>
     </tr>
     <tr>
-      <td>7</td>
+      <td>8</td>
       <td><a href="./.agents/skills/audit-database/SKILL.md"><code>audit-database</code></a></td>
       <td>Postgres for a new project: one database per owner, schema-qualified names, and an index only for a measured access path. <a href="./.agents/skills/audit-database/references/database-contract.md">Standard</a>.</td>
     </tr>

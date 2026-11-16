@@ -1,0 +1,10 @@
+skill: audit-source-structure
+should_trigger:
+  - Audit this project's source layout.
+  - Where should a new FastAPI use case and its SQL live?
+  - Check whether our Next.js files sit in the right directories.
+should_not_trigger:
+  - Start a new project named Northwind with an API and a database.
+  - Audit this API against the REST standard.
+  - Add a test for the invoice total.
+first_action: Read references/source-structure.md, inventory the trees, build the verdict table, and stop for approval before editing.

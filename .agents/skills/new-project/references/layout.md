@@ -53,6 +53,8 @@ When the API is copied without the database, delete `apps/api/alembic.ini`, `app
 
 Python 3.12 or newer. uv installs the project. The distribution name is `{{slug}}`. The import package is `app`, and it lives in `src/` so tests import the installed package rather than a folder sitting next to them.
 
+The source-structure standard is `.agents/skills/audit-source-structure/references/source-structure.md`. The scaffold is the part of that tree this skill copies. The next module follows the standard.
+
 ```
 apps/api/src/app/domain            pure rules, no framework and no IO
 apps/api/src/app/application       use cases
@@ -78,7 +80,7 @@ apps/web/src/app/api/          route handlers, including GET /api/health
 apps/web/src/lib/
 ```
 
-`package.json` sets `engines.node` to 20.9 or newer. A browser call goes to a route handler under `src/app/api`. It does not call port 8000. Add a handler there when the web app needs the API.
+`package.json` sets `engines.node` to 20.9 or newer. A browser call goes to a route handler under `src/app/api`. It does not call port 8000. Add a handler there when the web app needs the API. A route-private file follows the source-structure standard: `_components` and `_lib` under the route, shared UI in `src/components`, shared modules in `src/lib`.
 
 A visible time states its kind in sentence case. Unless the time is the user's own action, the label also states the source, for example "As of 14:32 · Exchange" or "Synced 2m ago · This API". The page states one provenance. A row adds its own time only when its kind or its source differs from that page.
 
@@ -108,6 +110,7 @@ When the API and the database are both present, replace `apps/api/src/app/infras
 
 `assets/AGENTS.md` is the starter. Set `{{surfaces}}` to the surfaces that were created. Add these rules when the surface exists:
 
+- API or web: cite `.agents/skills/audit-source-structure/references/source-structure.md`.
 - API: domain code imports no framework and does no IO. HTTP lives in `app/api`. Postgres lives in `app/infrastructure`. Ruff line length is 100, and `uv run mypy` stays clean for `app`. The API listens on `127.0.0.1:8000`. A timestamp field's name states the moment: event, source publication, time this API served the payload, or a user action.
 - Web: the web app listens on `127.0.0.1:3000`. Browser calls go through this app's route handlers. A visible time states its kind and, unless it is the user's own action, its source.
 - Database: cite `.agents/skills/audit-database/references/database-contract.md`. The database name, role, and schema are `{{db}}` on `127.0.0.1:5432`. A host other than loopback is refused. Objects are schema-qualified. The migration connection pins `search_path=public`. The version table is `alembic_version_{{db}}` in `public`. An applied revision is not edited.
