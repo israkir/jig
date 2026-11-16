@@ -1,0 +1,10 @@
+skill: write-tests
+should_trigger:
+  - Add a test for the invoice total.
+  - This calculation broke once; guard that case.
+  - Cover the failure path when the amount is missing.
+should_not_trigger:
+  - Audit the test suite and drop what does not earn its keep.
+  - Audit this API against the REST standard.
+  - Start a new project named Northwind.
+first_action: Read ../audit-tests/references/testing-contract.md. Name an input and a wrong result in a Guards comment, run the test once while that break is present, then make it pass.

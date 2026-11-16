@@ -1,0 +1,10 @@
+skill: audit-tests
+should_trigger:
+  - Audit this project's tests against the testing standard.
+  - Prune the suite and drop tests that do not earn their keep.
+  - Which tests add friction without guarding product behaviour?
+should_not_trigger:
+  - Add a test for the invoice total.
+  - Audit this API against the REST standard.
+  - Start a new project named Northwind.
+first_action: Read references/testing-contract.md, inventory without opening files, build the verdict table, and stop for approval before editing.

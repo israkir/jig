@@ -112,6 +112,16 @@ Setup, then API.
       <td><a href="./.agents/skills/audit-agent-setup/SKILL.md"><code>audit-agent-setup</code></a></td>
       <td>A project's own agent setup is audited: one <code>AGENTS.md</code>, one skills tree, one verify command. <a href="./.agents/skills/audit-agent-setup/references/agent-setup-rules.md">Standard</a>.</td>
     </tr>
+    <tr>
+      <td>4</td>
+      <td><a href="./.agents/skills/write-tests/SKILL.md"><code>write-tests</code></a></td>
+      <td>Tests guard one named break in product behaviour, at the cheapest tier that can catch it. <a href="./.agents/skills/audit-tests/references/testing-contract.md">Standard</a>.</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><a href="./.agents/skills/audit-tests/SKILL.md"><code>audit-tests</code></a></td>
+      <td>An existing suite is audited against the testing standard. <a href="./.agents/skills/audit-tests/references/testing-contract.md">Standard</a>.</td>
+    </tr>
   </tbody>
 </table>
 
@@ -138,7 +148,8 @@ Each standard is a skill: a short procedure plus a contract in `references/`. Th
 
 Library floors live in one place per surface: [`apps/api/pyproject.toml`](./.agents/skills/new-project/assets/api/pyproject.toml) and [`apps/web/package.json`](./.agents/skills/new-project/assets/web/package.json). A package manager may select a newer release above a floor.
 
----------|-----------|
+| Surface | Libraries |
+|---------|-----------|
 | API | FastAPI 0.162.4, Pydantic 2.14.3, uvicorn 0.54.0 |
 | API dev | httpx2 2.16.0, mypy 2.4.1, pytest 9.2.0, Ruff 0.17.4 |
 | Database | Alembic 1.20.1, psycopg 3.3.8, SQLAlchemy 2.1.8 |
