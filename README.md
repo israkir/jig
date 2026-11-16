@@ -127,6 +127,11 @@ Setup, then API.
       <td><a href="./.agents/skills/audit-secrets/SKILL.md"><code>audit-secrets</code></a></td>
       <td>Secrets are SOPS + age: a schema, in-memory injection, and a separate production store. <a href="./.agents/skills/audit-secrets/references/secrets-contract.md">Standard</a>.</td>
     </tr>
+    <tr>
+      <td>7</td>
+      <td><a href="./.agents/skills/audit-database/SKILL.md"><code>audit-database</code></a></td>
+      <td>Postgres for a new project: one database per owner, schema-qualified names, and an index only for a measured access path. <a href="./.agents/skills/audit-database/references/database-contract.md">Standard</a>.</td>
+    </tr>
   </tbody>
 </table>
 

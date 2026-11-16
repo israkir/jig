@@ -4,7 +4,7 @@ description: Scaffolds a minimal working API, web app, database, or any combinat
 license: GPL-2.0
 compatibility: Cursor, Claude Code, ChatGPT Codex, and Antigravity via .agents/skills.
 metadata:
-  version: "1.5.0"
+  version: "1.6.0"
   category: dev
   tags: project,scaffold,makefile,fastapi,nextjs,postgres,sops
 ---
@@ -35,7 +35,7 @@ Take the project name from the user. Derive the three tokens in `references/layo
 
 The repository has none of these surfaces yet.
 
-1. Copy the files for each chosen surface from `assets/`. The map is in `references/layout.md`.
+1. Copy the files for each chosen surface from `assets/`. The map is in `references/layout.md`. When the database surface is included, follow the database standard that `references/layout.md` cites. Do not paste it into the project.
 2. Replace `{{slug}}`, `{{db}}`, and `{{title}}` in every copied file.
 3. Copy `assets/Makefile` to `Makefile`. Remove every target the project does not have, using the trim list in `references/makefile.md`.
 4. Write `AGENTS.md` from `assets/AGENTS.md` and `CLAUDE.md` from `assets/CLAUDE.md`. Replace `{{surfaces}}` with the chosen surfaces. Keep the Commands, Verify, Conventions, and Exceptions sections.

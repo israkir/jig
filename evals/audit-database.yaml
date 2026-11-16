@@ -1,0 +1,10 @@
+skill: audit-database
+should_trigger:
+  - Audit this project's database against the standard.
+  - Check our table names, foreign keys, indexes, and which schema each context uses.
+  - How should a new project name tables, columns, and indexes?
+should_not_trigger:
+  - Start a new project named Northwind with an API and a database.
+  - Audit this API against the REST standard.
+  - Add a test for the invoice total.
+first_action: Read references/database-contract.md, inventory the schema, build the verdict table, and stop for approval before editing.

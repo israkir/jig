@@ -1,9 +1,15 @@
-"""Alembic environment. The version table is alembic_version_{{db}} in public."""
+"""Alembic environment.
+
+The version table is alembic_version_{{db}} in public.
+The connection pins search_path=public so a role named {{db}} does not put
+that schema first on the path and hide it from Alembic's comparison.
+Objects are created as {{db}}.<name>.
+"""
 
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import create_engine, pool, text
+from sqlalchemy import create_engine, pool
 
 from app.infrastructure.db import sqlalchemy_url
 
@@ -29,9 +35,12 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = create_engine(sqlalchemy_url(), poolclass=pool.NullPool)
+    connectable = create_engine(
+        sqlalchemy_url(),
+        poolclass=pool.NullPool,
+        connect_args={"options": "-c search_path=public"},
+    )
     with connectable.connect() as connection:
-        connection.execute(text("SET search_path TO {{db}}, public"))
         context.configure(
             connection=connection,
             version_table=VERSION_TABLE,
