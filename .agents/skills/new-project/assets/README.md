@@ -15,7 +15,7 @@ This repository uses one stack. Install the tools for the parts that are present
 
 ## Libraries
 
-`make install` installs the libraries. The floors are the newest set that install together. The package manager may select a newer release above a floor.
+`make install` installs the libraries. Each manifest is its own set: the floors are the newest releases that install together and pass that surface's checks. The package manager may select a newer release above a floor. A later language or framework adds its own manifest and follows the same rule.
 
 | Present here | Where the versions live |
 |--------------|-------------------------|

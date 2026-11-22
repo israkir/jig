@@ -111,6 +111,7 @@ When the API and the database are both present, replace `apps/api/src/app/infras
 `assets/AGENTS.md` is the starter. Set `{{surfaces}}` to the surfaces that were created. Add these rules when the surface exists:
 
 - API or web: cite `.agents/skills/audit-source-structure/references/source-structure.md`.
+- A surface that declares libraries, including the API and the web app: cite `.agents/skills/new-project/references/libraries.md`. A library you add is the newest stable release that resolves with the floors already declared in that manifest and passes `make check`.
 - API: domain code imports no framework and does no IO. HTTP lives in `app/api`. Postgres lives in `app/infrastructure`. Ruff line length is 100, and `uv run mypy` stays clean for `app`. The API listens on `127.0.0.1:8000`. A timestamp field's name states the moment: event, source publication, time this API served the payload, or a user action.
 - Web: the web app listens on `127.0.0.1:3000`. Browser calls go through this app's route handlers. A visible time states its kind and, unless it is the user's own action, its source.
 - Database: cite `.agents/skills/audit-database/references/database-contract.md`. The database name, role, and schema are `{{db}}` on `127.0.0.1:5432`. A host other than loopback is refused. Objects are schema-qualified. The migration connection pins `search_path=public`. The version table is `alembic_version_{{db}}` in `public`. An applied revision is not edited.

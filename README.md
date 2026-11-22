@@ -188,7 +188,9 @@ Each standard is a skill: a short procedure plus a contract in `references/`. Th
 | Web | Node.js 20.9 or newer, and the npm shipped with it |
 | Database | Docker or Podman. Postgres 18 runs in a container on `127.0.0.1` |
 
-Library floors live in one place per surface: [`apps/api/pyproject.toml`](./.agents/skills/new-project/assets/api/pyproject.toml) and [`apps/web/package.json`](./.agents/skills/new-project/assets/web/package.json). A package manager may select a newer release above a floor.
+Library floors live in one manifest per surface: [`apps/api/pyproject.toml`](./.agents/skills/new-project/assets/api/pyproject.toml) for the Python API and [`apps/web/package.json`](./.agents/skills/new-project/assets/web/package.json) for the Next.js app. A new project raises each direct dependency to the newest stable release that resolves with the others in that manifest and passes that surface's checks. The procedure is [`references/libraries.md`](./.agents/skills/new-project/references/libraries.md). A later language or framework adds a row there. A package manager may select a newer release above a floor.
+
+Copied floors, which the new project raises:
 
 | Surface | Libraries |
 |---------|-----------|

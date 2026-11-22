@@ -4,14 +4,14 @@ description: Scaffolds a minimal working API, web app, database, or any combinat
 license: GPL-2.0
 compatibility: Cursor, Claude Code, ChatGPT Codex, and Antigravity via .agents/skills.
 metadata:
-  version: "1.7.0"
+  version: "1.8.0"
   category: dev
   tags: project,scaffold,makefile,fastapi,nextjs,postgres,sops
 ---
 
 # New project
 
-Scaffold only the surfaces the user asked for. The files to copy are in this skill. Read `references/layout.md` and `references/makefile.md` before writing anything. Do not paste those references into the project's README.
+Scaffold only the surfaces the user asked for. The files to copy are in this skill. Read `references/layout.md` and `references/makefile.md` before writing anything. When a surface declares libraries, read `references/libraries.md` before Verify. Do not paste those references into the project's README.
 
 ## Surfaces
 
@@ -42,10 +42,11 @@ The repository has none of these surfaces yet.
 5. Copy `assets/gitignore` to `.gitignore` and `assets/README.md` to `README.md`.
 6. `chmod +x postgres/initdb/00-init-database.sh` when the database surface is included.
 7. When the secrets surface is included, copy it from the map in `references/layout.md`. Append `assets/secrets/gitignore.lines` to `.gitignore`. Add the Secrets targets from `references/makefile.md`. Do not generate a private key.
+8. Raise the library floors in every copied manifest, as `references/libraries.md` describes.
 
 ## Existing repository
 
-Inventory first. Add a missing surface from the same assets. Keep a working target, app, or compose file. Add the missing help lines and recipes from `references/makefile.md`. Record the surfaces in `AGENTS.md`.
+Inventory first. Add a missing surface from the same assets. Keep a working target, app, or compose file. Add the missing help lines and recipes from `references/makefile.md`. Record the surfaces in `AGENTS.md`. When the new surface adds dependencies, raise those floors as `references/libraries.md` describes. Leave a floor the repository already had.
 
 ## Link the project
 
