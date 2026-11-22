@@ -4,7 +4,7 @@ description: Audits a Postgres schema against the database standard, covering co
 license: GPL-2.0
 compatibility: Cursor, Claude Code, ChatGPT Codex, and Antigravity via .agents/skills.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   category: database
   tags: audit,database,postgres,schema,indexes
 ---
@@ -31,12 +31,13 @@ Locate migrations, schema SQL, grants, and the Alembic env. Note the engine, the
 CREATE SCHEMA|CREATE TABLE|CREATE INDEX|CREATE UNIQUE INDEX
 alembic_version|search_path|version_table
 ON DELETE|ON UPDATE
-timestamp without|double precision|real |ENUM
+timestamp without|double precision|real |ENUM|varchar|character varying|char(|jsonb|numeric
 uuidv7|gen_random_uuid|created_at|updated_at|fetched_at
+PRIMARY KEY|REFERENCES
 GRANT |CREATE ROLE
 ```
 
-Open the migration that creates each table. A dump or a generated model is evidence of names. The migration is the authority when they disagree.
+Open the migration that creates each table. A dump or a generated model is evidence of names. The migration is the authority when they disagree. A `numeric` with no scale, a `jsonb` column a query reads, and a `PRIMARY KEY` or `REFERENCES` on a column line are D7 and D8.
 
 Build this table and stop.
 

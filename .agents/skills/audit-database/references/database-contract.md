@@ -47,17 +47,21 @@ Grants name the role. They are in the migration that introduces the second conte
 
 ## D5. Tables and columns
 
-Tables are plural snake_case. The name says what one row is. A per-day grain starts with `daily_`. A header row for one derived series names the series and ends in `_builds` when the days are a child table. Operational status rows end in `_states`. A table that belongs to one country or source family carries that prefix (`tr_`, `us_`).
+Tables are plural snake_case. The name says what one row is. A per-day grain starts with `daily_`. A header row for one derived series names the series and ends in `_builds` when the days are a child table. Operational status rows end in `_states`. A country or source prefix (`tr_`, `us_`) is for a table whose columns exist only for that source. The same shape from several sources is one table, and a column carries what only one source states.
 
 | Kind | Column |
 |------|--------|
 | Foreign key | `<entity>_id` |
-| Business code | Ends in `_code` |
+| Code | Ends in `_code`. Our values are lower case. A source's values keep the source's spelling |
+| Instant | `*_at`, `timestamptz` |
+| Calendar day | `*_date`, `date`, as in `session_date`, `trade_date`, `as_of_date`. Never a bare `day`, `date`, or `as_of` |
+| Range bound | `*_from` and `*_to` |
+| Boolean | `is_*` or `has_*` |
 | Rate or share | A fraction named `*_fraction`. A source percent is converted at the writer |
 | Count | `*_count`, `integer` or `bigint` |
 | Position in a parent | `line_index` or `item_index` |
 | Closed set of our values | Lower-case `text` in a column named `*_type` |
-| A source's own code | The source's spelling. The column is `kind` when it is the source's classification |
+| Lifecycle | `status` |
 | Currency pair | `base_currency` and `quote_currency`, in the market's BASE/QUOTE order |
 | ISO currency | `text` matching `^[A-Z]{3}$` |
 | Free text | `text`. A maximum length is a `CHECK` when the limit is a business rule |
@@ -84,7 +88,9 @@ Every constraint and index has an explicit name.
 | Unique expression | `uq_<table>_<what>`, as in `uq_users_email_lower` on `lower(email)` |
 | Check | `ck_<table>_<condition>`. A check whose name ends in a column name tests that column |
 | Exclusion | `ex_<table>_<what>` |
-| Index | `ix_<table>_<columns>` |
+| Index | `ix_<table>_<columns>`. A partial index ends `_live`, `_open`, or names its condition |
+
+A constraint is a named table constraint. A column line carries neither `PRIMARY KEY` nor `REFERENCES`. A name is shortened only when the full spelling exceeds 63 characters, and the shorter name still starts with its prefix and the table.
 
 A writer that uses `ON CONFLICT ON CONSTRAINT` names a constraint that exists in the migration. A renamed constraint is a failed write the first time it runs.
 
@@ -92,7 +98,7 @@ A writer that uses `ON CONFLICT ON CONSTRAINT` names a constraint that exists in
 
 An unknown value is `NULL`. A writer stores the source's amount, unit, and identity. A row that cannot be mapped is an error, counted and listed. It is not inserted with a filled-in identity.
 
-Money, quantities, and rates are `NUMERIC`. Instants are `timestamptz`, stored in UTC. A calendar day is `date`. A closed set is `text` plus a named `CHECK`, so a later revision extends the list by replacing the constraint.
+A price, quantity, or amount is `numeric(24,8)`. A fraction is `numeric(9,6)`. A bare `numeric` stays only when the migration comment says why no scale fits. A world-fact table that stores a source's published number without rounding is that case. Instants are `timestamptz`, stored in UTC. A calendar day is `date`. Every string is `text`, with no `varchar(n)`, no `char(n)`, and no PostgreSQL enum. A closed set is `text` plus a named `CHECK`, so a later revision extends the list by replacing the constraint. `jsonb` is only a payload no query filters, joins, or sums. Anything a query reads is a column or a child table.
 
 A `CHECK` refuses a row whose parts disagree. A price that cannot be negative says so. A range whose low is above its high is refused. Two columns that are a pair are both set or both null. The writer surfaces the refusal. It does not retry with a silent default.
 
@@ -104,13 +110,14 @@ A rule that must hold no matter who writes is a constraint in the database. Appl
 
 A fact read from a source has `fetched_at timestamptz NOT NULL` and no `created_at` or `updated_at`. Every update of that row is a re-read, so a second clock would repeat `fetched_at`. A line table has none of the three. Its parent carries the time.
 
-A row written by a person or the product has `created_at timestamptz NOT NULL DEFAULT now()`. `updated_at` is present where such a row changes. One function, `<db>.set_updated_at`, assigns `now()`, and each of those tables has a `BEFORE UPDATE` trigger named `<table>_set_updated_at`. Statements leave `updated_at` alone.
+A row written by a person or the product has `created_at timestamptz NOT NULL DEFAULT now()`. `updated_at` is present where such a row changes. One function, `<db>.set_updated_at`, assigns `now()`, and each of those tables has a `BEFORE UPDATE` trigger named `<table>_set_updated_at`. Statements leave `updated_at` alone. The trigger is the only writer, including where an ORM would set `onupdate`.
 
 A fact that is read again uses one policy. The table's comment or the migration docstring names it.
 
 | Policy | Use | Key |
 |--------|-----|-----|
 | Overwrite | The newest reading is enough. This is the default | The fact's natural key. `fetched_at` shows when the source was read |
+| Source period | The source states the period | The key includes that date (`filed_on`, `as_of_date`). The same period is overwritten. A new period is a new row |
 | Revisions | A reader needs the value that was known at an earlier time | `fetched_at` is part of the key. A new row is written only when the content differs from the newest row, under an advisory lock per fact |
 | Snapshots | Each reading differs by nature | Each reading is a row. Retention removes rows outside the window |
 
@@ -139,7 +146,7 @@ A table that grows fastest and is read by time is range-partitioned by month on 
 
 Retention is a named job with a window per table. A table that exists to keep history has no window. Dropping a month partition is the delete. A row-by-row delete of an expired month is the path a partition was meant to avoid.
 
-A table that is updated constantly sets a lower `fillfactor` and a lower autovacuum scale factor. A large append-mostly table sets a lower autovacuum scale factor than the server default. The migration records the numbers. A crash drops planner statistics, so a worker that reads a large table runs `ANALYZE` when that table reports no rows.
+A table that is updated constantly sets a lower `fillfactor` and a lower autovacuum scale factor. It is not indexed on the column those updates rewrite unless a measured plan needs that index. A large append-mostly table sets a lower autovacuum scale factor than the server default. The migration records the numbers. A crash drops planner statistics, so a worker that reads a large table runs `ANALYZE` when that table reports no rows.
 
 A derived table stores a fingerprint of the inputs it was built from. The reader uses the stored rows while the fingerprint matches and otherwise computes the same answer. The fact database does not gain a column for the derivation.
 
